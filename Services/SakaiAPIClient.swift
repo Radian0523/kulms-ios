@@ -3,7 +3,7 @@ import Foundation
 actor SakaiAPIClient {
     static let shared = SakaiAPIClient()
 
-    private let baseURL = URL(string: "https://lms.gakusei.kyoto-u.ac.jp")!
+    private let baseURLString = "https://lms.gakusei.kyoto-u.ac.jp"
     private let session: URLSession
     private let concurrentLimit = 4
 
@@ -14,22 +14,20 @@ actor SakaiAPIClient {
         self.session = URLSession(configuration: config)
     }
 
-    // MARK: - Session
-
-    struct SessionInfo: Decodable {
-        let userEid: String?
-        let userId: String?
-        let active: Bool?
+    private func url(_ path: String) -> URL {
+        URL(string: baseURLString + path)!
     }
 
+    // MARK: - Session
+
+    /// Check if we have a valid Sakai session by trying to fetch sites.
+    /// /direct/session.json returns a collection which is hard to parse,
+    /// so we just try /direct/site.json and see if it returns data.
     func checkSession() async throws -> Bool {
-        let url = baseURL.appendingPathComponent("/direct/session.json")
-        let (data, response) = try await session.data(from: url)
-        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-            return false
-        }
-        let info = try JSONDecoder().decode(SessionInfo.self, from: data)
-        return info.userId != nil && !(info.userId?.isEmpty ?? true)
+        let (_, response) = try await session.data(from: url("/direct/site.json?_limit=1"))
+        guard let http = response as? HTTPURLResponse else { return false }
+        // 200 = logged in, 403/302 = not logged in
+        return http.statusCode == 200
     }
 
     // MARK: - Courses
@@ -45,10 +43,7 @@ actor SakaiAPIClient {
     }
 
     func fetchCourses() async throws -> [(id: String, name: String, type: String)] {
-        var components = URLComponents(url: baseURL.appendingPathComponent("/direct/site.json"), resolvingAgainstBaseURL: false)!
-        components.queryItems = [URLQueryItem(name: "_limit", value: "200")]
-
-        let (data, response) = try await session.data(from: components.url!)
+        let (data, response) = try await session.data(from: url("/direct/site.json?_limit=200"))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
         }
@@ -78,8 +73,7 @@ actor SakaiAPIClient {
     }
 
     func fetchAssignments(siteId: String) async throws -> [RawAssignment] {
-        let url = baseURL.appendingPathComponent("/direct/assignment/site/\(siteId).json")
-        let (data, response) = try await session.data(from: url)
+        let (data, response) = try await session.data(from: url("/direct/assignment/site/\(siteId).json"))
         guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             throw APIError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
         }

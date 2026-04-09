@@ -30,7 +30,7 @@
 		A181C89BD7EB5DA81D9C233C /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		A5FF6DAC22FA5374E4B58C6B /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		A93C39463EAEB1421BCB94B9 /* SakaiAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SakaiAPIClient.swift; sourceTree = "<group>"; };
-		BCA10AD070E0B5588FF1ECA3 /* KULMS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = KULMS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BCA10AD070E0B5588FF1ECA3 /* KULMS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = KULMS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		C1AB176568B9F6B675D46180 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		E7FB9FE4FEBC354A794E0D31 /* KULMSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KULMSApp.swift; sourceTree = "<group>"; };
 		F66B1752ABE5272C0185D2F7 /* AssignmentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssignmentCardView.swift; sourceTree = "<group>"; };
@@ -100,10 +100,6 @@
 				7D6ED3E961661970D37B4204 /* Assets.xcassets */,
 				288C51A090E2381548349056 /* Info.plist */,
 				E7FB9FE4FEBC354A794E0D31 /* KULMSApp.swift */,
-				4F74EE83563A92E88134B5FD /* Models */,
-				984912785DC213D4082C7212 /* Services */,
-				CF238325CFF8BD3D5724D064 /* Stores */,
-				14D5F1F79AEC471180EDE15F /* Views */,
 			);
 			name = "kulms-ios";
 			path = .;
@@ -140,7 +136,6 @@
 				LastUpgradeCheck = 1600;
 				TargetAttributes = {
 					08B00D23D7194DE869728628 = {
-						DevelopmentTeam = "";
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -203,7 +198,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3C2S494Q5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -346,7 +341,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 3C2S494Q5V;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;

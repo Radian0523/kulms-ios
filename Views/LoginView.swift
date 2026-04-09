@@ -4,54 +4,76 @@ import WebKit
 struct LoginView: View {
     @EnvironmentObject private var store: AssignmentStore
     @State private var isVerifying = false
+    @State private var errorText: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                Text("KULMS")
-                    .font(.headline.bold())
-                Spacer()
-                if isVerifying {
-                    ProgressView()
-                        .controlSize(.small)
-                    Text("認証確認中...")
+        ZStack(alignment: .bottom) {
+            SSOWebView(onLoginDetected: handleLogin)
+
+            // Bottom overlay with login button
+            VStack(spacing: 8) {
+                if let error = errorText {
+                    Text(error)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.red)
                 }
+
+                Button {
+                    handleLogin()
+                } label: {
+                    if isVerifying {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .controlSize(.small)
+                                .tint(.white)
+                            Text("認証を確認中...")
+                        }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Text("ログイン完了 → 課題一覧へ")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .disabled(isVerifying)
+
+                Text("SSOログイン後にタップしてください")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
             .padding()
-            .background(.bar)
-
-            SSOWebView(onLoginDetected: handleLogin)
+            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+            .padding()
         }
     }
 
     private func handleLogin() {
         guard !isVerifying else { return }
         isVerifying = true
+        errorText = nil
 
         Task {
-            // Transfer WKWebView cookies to URLSession
+            // Transfer ALL cookies from WKWebView to URLSession
             let wkStore = WKWebsiteDataStore.default().httpCookieStore
             let cookies = await wkStore.allCookies()
             for cookie in cookies {
                 HTTPCookieStorage.shared.setCookie(cookie)
             }
 
-            // Verify session
+            // Verify with Sakai API
             do {
                 let valid = try await SakaiAPIClient.shared.checkSession()
-                await MainActor.run {
-                    if valid {
-                        store.isLoggedIn = true
-                    }
-                    isVerifying = false
+                if valid {
+                    store.isLoggedIn = true
+                } else {
+                    errorText = "セッションが確認できません。ログインしてから再度タップしてください。"
                 }
             } catch {
-                await MainActor.run {
-                    isVerifying = false
-                }
+                errorText = "確認に失敗しました: \(error.localizedDescription)"
             }
+            isVerifying = false
         }
     }
 }
@@ -92,15 +114,21 @@ struct SSOWebView: UIViewRepresentable {
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
             guard !hasDetected,
                   let url = webView.url,
-                  url.host == "lms.gakusei.kyoto-u.ac.jp",
+                  let host = url.host,
+                  host == "lms.gakusei.kyoto-u.ac.jp",
                   url.path.hasPrefix("/portal") else { return }
 
-            // Check if we're on the portal (not the login redirect)
-            // SSO sends the user through IdP, then back to lms.gakusei.kyoto-u.ac.jp
-            webView.evaluateJavaScript(
-                "document.querySelector('#loginLink1') === null"
-            ) { [weak self] result, _ in
-                if let loggedIn = result as? Bool, loggedIn {
+            // Auto-detect: check for session cookie
+            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
+                let hasSakaiSession = cookies.contains { cookie in
+                    cookie.domain.contains("gakusei.kyoto-u.ac.jp")
+                    && (cookie.name == "JSESSIONID"
+                        || cookie.name == "sakai.session"
+                        || cookie.name.lowercased().contains("session"))
+                }
+                guard hasSakaiSession else { return }
+
+                DispatchQueue.main.async {
                     self?.hasDetected = true
                     self?.onLoginDetected()
                 }
