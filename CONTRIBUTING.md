@@ -47,4 +47,5 @@ KULMSApp.swift   # App エントリポイント + ContentView
 
 ## Issue
 
-バグ報告・機能リクエストは [Issue テンプレート](https://github.com/Radian0523/kulms-ios/issues/new/choose) を使用してください。
+- バグ報告・機能リクエストは [Issue テンプレート](https://github.com/Radian0523/kulms-ios/issues/new/choose) を使用してください
+- フィードバックフォーム: [Google Forms](https://docs.google.com/forms/d/e/1FAIpQLSdmc4tCHa98mzt1j4Wxu9IJo88wKz3-VQHVYAQjbtJ3Jo_CPw/viewform)

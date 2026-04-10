@@ -46,3 +46,7 @@ open KULMS.xcodeproj
 ```
 
 Xcodeでビルド・実行。初回起動時にSSOでログインすると課題一覧が表示される。
+
+## フィードバック
+
+ご意見・要望は [こちらのフォーム](https://docs.google.com/forms/d/e/1FAIpQLSdmc4tCHa98mzt1j4Wxu9IJo88wKz3-VQHVYAQjbtJ3Jo_CPw/viewform) からお送りください。アプリの設定画面からもアクセスできます。
