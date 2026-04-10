@@ -57,13 +57,23 @@ struct KULMSApp: App {
                 let results = try await SakaiAPIClient.shared.fetchAllAssignments()
                 var assignments: [Assignment] = []
                 for result in results {
-                    for raw in result.assignments {
+                    for detail in result.assignments {
+                        let raw = detail.raw
                         let deadline = raw.dueTime?.date ?? raw.dueDate?.date ?? raw.closeTime?.date
                         var status = ""
-                        if raw.submitted == true {
-                            status = "提出済"
-                        } else if let s = raw.submissionStatus {
-                            status = s
+                        if let submission = detail.submissions.first {
+                            if submission.graded == true {
+                                status = "評定済"
+                            } else if submission.userSubmission == true || (submission.dateSubmittedEpochSeconds ?? 0) > 0 {
+                                status = "提出済"
+                            }
+                        }
+                        if status.isEmpty {
+                            if raw.submitted == true {
+                                status = "提出済"
+                            } else if let s = raw.submissionStatus {
+                                status = s
+                            }
                         }
                         assignments.append(Assignment(
                             courseId: result.course.id,
@@ -71,7 +81,22 @@ struct KULMSApp: App {
                             title: raw.title ?? "",
                             deadline: deadline,
                             status: status,
-                            grade: raw.gradeDisplay ?? raw.grade ?? ""
+                            grade: raw.gradeDisplay ?? raw.grade ?? "",
+                            entityId: raw.assignmentId ?? ""
+                        ))
+                    }
+                    for quiz in result.quizzes {
+                        let deadline = quiz.dueDate?.date ?? quiz.retractDate?.date
+                        var status = ""
+                        if quiz.submitted == true { status = "提出済" }
+                        assignments.append(Assignment(
+                            courseId: result.course.id,
+                            courseName: result.course.name,
+                            title: quiz.title ?? "",
+                            deadline: deadline,
+                            status: status,
+                            itemType: "quiz",
+                            entityId: quiz.publishedAssessmentId.map { String($0) } ?? ""
                         ))
                     }
                 }
@@ -101,10 +126,16 @@ struct ContentView: View {
     @EnvironmentObject private var store: AssignmentStore
 
     var body: some View {
-        if store.isLoggedIn {
-            AssignmentListView()
-        } else {
+        ZStack {
+            // Both views always exist. LoginView keeps the WKWebView alive.
+            // zIndex controls which is on top.
             LoginView()
+                .zIndex(store.isLoggedIn ? 0 : 1)
+                .allowsHitTesting(!store.isLoggedIn)
+
+            AssignmentListView()
+                .zIndex(store.isLoggedIn ? 1 : 0)
+                .allowsHitTesting(store.isLoggedIn)
         }
     }
 }

@@ -65,7 +65,14 @@ final class AssignmentStore: ObservableObject {
         return sections
     }
 
-    // MARK: - Fetch
+    // MARK: - Load Cache (startup only, no network)
+
+    func loadCached() {
+        guard assignments.isEmpty else { return }
+        loadFromCache()
+    }
+
+    // MARK: - Fetch (network, called from refresh button / after login)
 
     func fetchAll(forceRefresh: Bool = false) async {
         guard !isLoading else { return }
@@ -77,22 +84,15 @@ final class AssignmentStore: ObservableObject {
             return
         }
 
-        // Try loading from SwiftData cache first
-        if !forceRefresh, assignments.isEmpty {
-            loadFromCache()
-            if !assignments.isEmpty, let last = lastRefreshed,
-               Date.now.timeIntervalSince(last) < cacheTTL {
-                return
-            }
-        }
-
         isLoading = true
         errorMessage = nil
         progress = nil
 
         do {
             // Check session
+            print("[KULMS] fetchAll: checking session...")
             let sessionValid = try await SakaiAPIClient.shared.checkSession()
+            print("[KULMS] fetchAll: session valid = \(sessionValid)")
             guard sessionValid else {
                 isLoggedIn = false
                 isLoading = false
@@ -100,6 +100,7 @@ final class AssignmentStore: ObservableObject {
             }
 
             // Fetch all
+            print("[KULMS] fetchAll: fetching assignments...")
             let results = try await SakaiAPIClient.shared.fetchAllAssignments { [weak self] completed, total in
                 Task { @MainActor in
                     self?.progress = (completed, total)
@@ -112,14 +113,33 @@ final class AssignmentStore: ObservableObject {
 
             for result in results {
                 let course = result.course
-                for raw in result.assignments {
+
+                // Process assignments
+                for detail in result.assignments {
+                    let raw = detail.raw
                     let deadline = raw.dueTime?.date ?? raw.dueDate?.date ?? raw.closeTime?.date
 
+                    // Determine status from individual API first
                     var status = ""
-                    if raw.submitted == true {
-                        status = "提出済"
-                    } else if let s = raw.submissionStatus {
-                        status = s
+                    var grade = ""
+                    if let submission = detail.submissions.first {
+                        if submission.graded == true {
+                            status = "評定済"
+                            grade = submission.grade ?? ""
+                        } else if submission.userSubmission == true || (submission.dateSubmittedEpochSeconds ?? 0) > 0 {
+                            status = "提出済"
+                        }
+                    }
+                    // Fallback to list API data
+                    if status.isEmpty {
+                        if raw.submitted == true {
+                            status = "提出済"
+                        } else if let s = raw.submissionStatus {
+                            status = s
+                        }
+                    }
+                    if grade.isEmpty {
+                        grade = raw.gradeDisplay ?? raw.grade ?? ""
                     }
 
                     let assignUrl: String
@@ -140,17 +160,44 @@ final class AssignmentStore: ObservableObject {
                         url: assignUrl,
                         deadline: deadline,
                         status: status,
-                        grade: raw.gradeDisplay ?? raw.grade ?? ""
+                        grade: grade,
+                        entityId: raw.assignmentId ?? ""
                     )
 
-                    // Preserve checked state
                     if existingChecked.contains(assignment.compositeKey) {
                         assignment.isChecked = true
                     }
+                    newAssignments.append(assignment)
+                }
 
+                // Process quizzes
+                for quiz in result.quizzes {
+                    let deadline = quiz.dueDate?.date ?? quiz.retractDate?.date
+
+                    var status = ""
+                    if quiz.submitted == true {
+                        status = "提出済"
+                    }
+
+                    let assignment = Assignment(
+                        courseId: course.id,
+                        courseName: course.name,
+                        title: quiz.title ?? "",
+                        url: "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)",
+                        deadline: deadline,
+                        status: status,
+                        itemType: "quiz",
+                        entityId: quiz.publishedAssessmentId.map { String($0) } ?? ""
+                    )
+
+                    if existingChecked.contains(assignment.compositeKey) {
+                        assignment.isChecked = true
+                    }
                     newAssignments.append(assignment)
                 }
             }
+
+            print("[KULMS] fetchAll: \(newAssignments.count) assignments built (\(newAssignments.filter { $0.itemType == "quiz" }.count) quizzes)")
 
             // Save to SwiftData
             saveToCache(newAssignments)
@@ -163,6 +210,7 @@ final class AssignmentStore: ObservableObject {
             await NotificationService.shared.scheduleNotifications(for: newAssignments)
 
         } catch {
+            print("[KULMS] fetchAll error: \(error)")
             errorMessage = error.localizedDescription
         }
 

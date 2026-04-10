@@ -13,6 +13,8 @@ final class Assignment {
     var grade: String
     var isChecked: Bool
     var cachedAt: Date
+    var itemType: String = "assignment"
+    var entityId: String = ""
 
     init(
         courseId: String,
@@ -23,9 +25,11 @@ final class Assignment {
         status: String = "",
         grade: String = "",
         isChecked: Bool = false,
-        cachedAt: Date = .now
+        cachedAt: Date = .now,
+        itemType: String = "assignment",
+        entityId: String = ""
     ) {
-        self.compositeKey = "\(courseId):\(title)"
+        self.compositeKey = "\(courseId):\(itemType):\(title)"
         self.courseId = courseId
         self.courseName = courseName
         self.title = title
@@ -35,6 +39,8 @@ final class Assignment {
         self.grade = grade
         self.isChecked = isChecked
         self.cachedAt = cachedAt
+        self.itemType = itemType
+        self.entityId = entityId
     }
 
     // MARK: - Urgency

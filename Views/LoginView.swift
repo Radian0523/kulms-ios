@@ -7,10 +7,10 @@ struct LoginView: View {
     @State private var errorText: String?
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            SSOWebView(onLoginDetected: handleLogin)
+        VStack(spacing: 0) {
+            SSOWebView()
 
-            // Bottom overlay with login button
+            // Bottom bar with login button
             VStack(spacing: 8) {
                 if let error = errorText {
                     Text(error)
@@ -44,8 +44,14 @@ struct LoginView: View {
                     .foregroundStyle(.secondary)
             }
             .padding()
-            .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
-            .padding()
+            .background(.bar)
+        }
+        .onChange(of: store.isLoggedIn) { _, newValue in
+            if !newValue {
+                // Session expired — reload portal to trigger SSO redirect
+                let url = URL(string: "https://lms.gakusei.kyoto-u.ac.jp/portal")!
+                WebViewFetcher.shared.webView.load(URLRequest(url: url))
+            }
         }
     }
 
@@ -55,22 +61,25 @@ struct LoginView: View {
         errorText = nil
 
         Task {
-            // Transfer ALL cookies from WKWebView to URLSession
-            let wkStore = WKWebsiteDataStore.default().httpCookieStore
-            let cookies = await wkStore.allCookies()
-            for cookie in cookies {
-                HTTPCookieStorage.shared.setCookie(cookie)
-            }
+            let wv = WebViewFetcher.shared.webView
 
-            // Verify with Sakai API
             do {
-                let valid = try await SakaiAPIClient.shared.checkSession()
-                if valid {
+                let result = try await wv.callAsyncJavaScript(
+                    "const r = await fetch('/direct/site.json?_limit=1', {credentials:'include', cache:'no-store'}); return await r.text();",
+                    contentWorld: .page
+                )
+                let text = result as? String ?? ""
+                print("[KULMS] login: fetch result (\(text.count) chars)")
+
+                if text.contains("site_collection") && text.count > 60 {
                     store.isLoggedIn = true
+                    // Auto-fetch assignments after login
+                    await store.fetchAll(forceRefresh: true)
                 } else {
                     errorText = "セッションが確認できません。ログインしてから再度タップしてください。"
                 }
             } catch {
+                print("[KULMS] login: fetch error: \(error)")
                 errorText = "確認に失敗しました: \(error.localizedDescription)"
             }
             isVerifying = false
@@ -81,58 +90,15 @@ struct LoginView: View {
 // MARK: - WKWebView Wrapper
 
 struct SSOWebView: UIViewRepresentable {
-    let onLoginDetected: () -> Void
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(onLoginDetected: onLoginDetected)
-    }
-
     func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .default()
-
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.navigationDelegate = context.coordinator
-        webView.allowsBackForwardNavigationGestures = true
+        let wv = WebViewFetcher.shared.webView
+        wv.allowsBackForwardNavigationGestures = true
 
         let url = URL(string: "https://lms.gakusei.kyoto-u.ac.jp/portal")!
-        webView.load(URLRequest(url: url))
+        wv.load(URLRequest(url: url))
 
-        return webView
+        return wv
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {}
-
-    class Coordinator: NSObject, WKNavigationDelegate {
-        let onLoginDetected: () -> Void
-        private var hasDetected = false
-
-        init(onLoginDetected: @escaping () -> Void) {
-            self.onLoginDetected = onLoginDetected
-        }
-
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            guard !hasDetected,
-                  let url = webView.url,
-                  let host = url.host,
-                  host == "lms.gakusei.kyoto-u.ac.jp",
-                  url.path.hasPrefix("/portal") else { return }
-
-            // Auto-detect: check for session cookie
-            webView.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
-                let hasSakaiSession = cookies.contains { cookie in
-                    cookie.domain.contains("gakusei.kyoto-u.ac.jp")
-                    && (cookie.name == "JSESSIONID"
-                        || cookie.name == "sakai.session"
-                        || cookie.name.lowercased().contains("session"))
-                }
-                guard hasSakaiSession else { return }
-
-                DispatchQueue.main.async {
-                    self?.hasDetected = true
-                    self?.onLoginDetected()
-                }
-            }
-        }
-    }
 }

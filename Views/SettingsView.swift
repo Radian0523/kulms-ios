@@ -44,6 +44,13 @@ struct SettingsView: View {
                     }
                 }
 
+                // Feedback
+                Section {
+                    Link(destination: URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSdFa9VASkP0ea8uHK9GEPS3r3VnoOcIpKO0dsIeCACElvCH-Q/viewform")!) {
+                        Label("ご意見・要望を送る", systemImage: "envelope")
+                    }
+                }
+
                 // Logout
                 Section {
                     Button(role: .destructive) {

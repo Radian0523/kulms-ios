@@ -18,14 +18,26 @@ struct AssignmentCardView: View {
 
             // Card body
             VStack(alignment: .leading, spacing: 6) {
-                // Course name pill
-                Text(assignment.courseName)
-                    .font(.caption2.bold())
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(urgencyColor.opacity(0.15))
-                    .foregroundStyle(urgencyColor)
-                    .clipShape(Capsule())
+                // Course name pill + quiz badge
+                HStack(spacing: 4) {
+                    Text(assignment.courseName)
+                        .font(.caption2.bold())
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(urgencyColor.opacity(0.15))
+                        .foregroundStyle(urgencyColor)
+                        .clipShape(Capsule())
+
+                    if assignment.itemType == "quiz" {
+                        Text("テスト")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.purple.opacity(0.12))
+                            .foregroundStyle(.purple)
+                            .clipShape(Capsule())
+                    }
+                }
 
                 // Title (tappable link)
                 if let url = URL(string: assignment.url) {

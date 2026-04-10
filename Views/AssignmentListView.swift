@@ -24,10 +24,19 @@ struct AssignmentListView: View {
                         .foregroundStyle(.primary)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
+                    HStack(spacing: 12) {
+                        Button {
+                            Task { await store.fetchAll(forceRefresh: true) }
+                        } label: {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        .disabled(store.isLoading)
+
+                        Button {
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape")
+                        }
                     }
                 }
             }
@@ -35,7 +44,7 @@ struct AssignmentListView: View {
                 SettingsView()
             }
             .task {
-                await store.fetchAll()
+                store.loadCached()
             }
         }
     }
@@ -67,10 +76,18 @@ struct AssignmentListView: View {
             let sections = store.groupedAssignments
             if sections.isEmpty && !store.isLoading {
                 Section {
-                    Text("課題が見つかりませんでした")
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.vertical, 32)
+                    VStack(spacing: 12) {
+                        Text("課題が見つかりませんでした")
+                            .foregroundStyle(.secondary)
+                        Button {
+                            Task { await store.fetchAll(forceRefresh: true) }
+                        } label: {
+                            Label("再取得", systemImage: "arrow.clockwise")
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.vertical, 32)
                 }
             }
 

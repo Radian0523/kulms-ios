@@ -8,9 +8,11 @@
 
 - **SSO認証**: WKWebViewで京大のシングルサインオンに対応
 - **課題一覧**: Sakai Direct APIから全科目の課題を取得し、緊急度別に表示
+- **テスト/クイズ対応**: Sakai sam_pub APIからテスト・クイズも取得し課題と統合表示
+- **提出状態の正確な判定**: 個別課題APIで提出済み・評定済みを正確に判定
 - **締切リマインド**: 24時間前・1時間前にローカル通知
 - **バックグラウンド更新**: 定期的に課題を再取得し通知をスケジュール
-- **オフラインキャッシュ**: SwiftDataで課題をローカル保存（TTL: 30分）
+- **オフラインキャッシュ**: SwiftDataで課題をローカル保存。起動時はキャッシュを即座に表示し、更新ボタンで最新データを取得
 
 ## 緊急度の分類
 
@@ -21,12 +23,17 @@
 | 🟢 | 14日以内 | 14日以内 |
 | ⚪ | その他 | 14日以上先 / 期限なし |
 
+## アーキテクチャ
+
+API呼び出しはすべてWKWebViewの`callAsyncJavaScript`経由の`fetch()`で実行。URLSessionではSakai のセッションcookieが認証されないため、SSOログインと同一のWKWebViewインスタンスを使用する設計。
+
+ContentViewのZStackにLoginView（WKWebView保持）とAssignmentListViewを常に配置し、WKWebViewがビュー階層から外れないことを保証。
+
 ## 技術スタック
 
 - Swift / SwiftUI / SwiftData
 - iOS 17+
-- WKWebView (SSO認証のみ)
-- URLSession + Cookie認証
+- WKWebView (SSO認証 + API呼び出し)
 - UNUserNotificationCenter
 - BGTaskScheduler
 
