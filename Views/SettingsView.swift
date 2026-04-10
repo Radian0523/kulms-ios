@@ -46,7 +46,7 @@ struct SettingsView: View {
 
                 // Feedback & Support
                 Section {
-                    Link(destination: URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSdFa9VASkP0ea8uHK9GEPS3r3VnoOcIpKO0dsIeCACElvCH-Q/viewform")!) {
+                    Link(destination: URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSdmc4tCHa98mzt1j4Wxu9IJo88wKz3-VQHVYAQjbtJ3Jo_CPw/viewform")!) {
                         Label("ご意見・要望を送る", systemImage: "envelope")
                     }
                     Link(destination: URL(string: "https://ko-fi.com/radian0523")!) {
