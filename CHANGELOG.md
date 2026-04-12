@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.1
+
+- 「取組中」の課題が「完了済み」に誤分類されるバグを修正
+  - Sakai API の `userSubmission` は下書き保存でも `true` になるため、`submitted && !draft` で判定するよう修正
+  - サーバー計算の `status` フィールドを活用し「取組中」等を正しく表示
+
 ## v1.0.0
 
 初回リリース。Chrome拡張版の主要機能をiOSネイティブに移植。
