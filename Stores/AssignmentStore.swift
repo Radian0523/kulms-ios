@@ -126,8 +126,10 @@ final class AssignmentStore: ObservableObject {
                         if submission.graded == true {
                             status = "評定済"
                             grade = submission.grade ?? ""
-                        } else if submission.userSubmission == true || (submission.dateSubmittedEpochSeconds ?? 0) > 0 {
+                        } else if submission.submitted == true && submission.draft != true {
                             status = "提出済"
+                        } else if let s = submission.status, s != "未開始" {
+                            status = s
                         }
                     }
                     // Fallback to list API data
