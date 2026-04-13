@@ -28,9 +28,16 @@ final class AssignmentStore: ObservableObject {
     }
 
     var groupedAssignments: [GroupedSection] {
-        let active = assignments.filter { !$0.isSubmitted && !$0.isChecked }
-        let submitted = assignments.filter { $0.isSubmitted && !$0.isChecked }
-        let checked = assignments.filter { $0.isChecked }
+        let autoComplete = UserDefaults.standard.object(forKey: "autoComplete") as? Bool ?? true
+
+        // Hide overdue + completed (submitted or checked)
+        let visible = assignments.filter { a in
+            let isCompleted = a.isChecked || (autoComplete && a.isSubmitted)
+            return !(a.urgency == .overdue && isCompleted)
+        }
+
+        let active = visible.filter { a in !(a.isChecked || (autoComplete && a.isSubmitted)) }
+        let completed = visible.filter { a in a.isChecked || (autoComplete && a.isSubmitted) }
 
         let sorted = active.sorted { a, b in
             guard let da = a.deadline else { return false }
@@ -38,12 +45,16 @@ final class AssignmentStore: ObservableObject {
             return da < db
         }
 
-        let danger = sorted.filter { $0.urgency == .overdue || $0.urgency == .danger }
+        let overdue = sorted.filter { $0.urgency == .overdue }
+        let danger = sorted.filter { $0.urgency == .danger }
         let warning = sorted.filter { $0.urgency == .warning }
         let success = sorted.filter { $0.urgency == .success }
         let other = sorted.filter { $0.urgency == .other }
 
         var sections: [GroupedSection] = []
+        if !overdue.isEmpty {
+            sections.append(GroupedSection(id: "overdue", label: "遅延提出", colorHex: "#e85555", assignments: overdue))
+        }
         if !danger.isEmpty {
             sections.append(GroupedSection(id: "danger", label: "緊急", colorHex: "#e85555", assignments: danger))
         }
@@ -56,11 +67,8 @@ final class AssignmentStore: ObservableObject {
         if !other.isEmpty {
             sections.append(GroupedSection(id: "other", label: "その他", colorHex: "#777777", assignments: other))
         }
-        if !submitted.isEmpty {
-            sections.append(GroupedSection(id: "submitted", label: "提出済み", colorHex: "#777777", assignments: submitted))
-        }
-        if !checked.isEmpty {
-            sections.append(GroupedSection(id: "checked", label: "完了済み", colorHex: "#777777", assignments: checked))
+        if !completed.isEmpty {
+            sections.append(GroupedSection(id: "completed", label: "完了済み", colorHex: "#777777", assignments: completed))
         }
         return sections
     }
@@ -126,7 +134,7 @@ final class AssignmentStore: ObservableObject {
                         if submission.graded == true {
                             status = "評定済"
                             grade = submission.grade ?? ""
-                        } else if submission.submitted == true && submission.draft != true {
+                        } else if submission.userSubmission == true && submission.draft != true {
                             status = "提出済"
                         } else if let s = submission.status, s != "未開始" {
                             status = s
@@ -217,13 +225,6 @@ final class AssignmentStore: ObservableObject {
         }
 
         isLoading = false
-    }
-
-    // MARK: - Toggle Check
-
-    func toggleChecked(_ assignment: Assignment) {
-        assignment.isChecked.toggle()
-        try? modelContext?.save()
     }
 
     // MARK: - Cache (SwiftData)

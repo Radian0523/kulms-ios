@@ -4,12 +4,21 @@ import WebKit
 struct SettingsView: View {
     @EnvironmentObject private var store: AssignmentStore
     @Environment(\.dismiss) private var dismiss
+    @AppStorage("autoComplete") private var autoComplete = true
     @State private var notificationsEnabled = false
     @State private var showLogoutConfirm = false
 
     var body: some View {
         NavigationStack {
             List {
+                // Auto-complete
+                Section("課題更新") {
+                    Toggle("提出状態の自動判定", isOn: $autoComplete)
+                    Text("OFFにすると手動チェックのみで完了判定")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 // Notifications
                 Section("通知") {
                     Toggle("締切リマインド", isOn: $notificationsEnabled)

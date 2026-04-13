@@ -1,21 +1,10 @@
 import SwiftUI
 
 struct AssignmentCardView: View {
-    @EnvironmentObject private var store: AssignmentStore
     let assignment: Assignment
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            // Checkbox
-            Button {
-                store.toggleChecked(assignment)
-            } label: {
-                Image(systemName: assignment.isChecked ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
-                    .foregroundStyle(assignment.isChecked ? .green : .secondary)
-            }
-            .buttonStyle(.plain)
-
             // Card body
             VStack(alignment: .leading, spacing: 6) {
                 // Course name pill + quiz badge
@@ -43,13 +32,11 @@ struct AssignmentCardView: View {
                 if let url = URL(string: assignment.url) {
                     Link(assignment.title, destination: url)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(assignment.isChecked ? .secondary : .primary)
-                        .strikethrough(assignment.isChecked)
+                        .foregroundStyle(.primary)
                 } else {
                     Text(assignment.title)
                         .font(.subheadline.weight(.medium))
-                        .foregroundStyle(assignment.isChecked ? .secondary : .primary)
-                        .strikethrough(assignment.isChecked)
+                        .foregroundStyle(.primary)
                 }
 
                 // Meta: deadline + remaining
@@ -80,7 +67,6 @@ struct AssignmentCardView: View {
             Spacer(minLength: 0)
         }
         .padding(.vertical, 4)
-        .opacity(assignment.isChecked ? 0.6 : 1)
     }
 
     // MARK: - Helpers
