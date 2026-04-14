@@ -219,6 +219,10 @@ final class AssignmentStore: ObservableObject {
             // Schedule notifications
             await NotificationService.shared.scheduleNotifications(for: newAssignments)
 
+        } catch SakaiAPIClient.APIError.sessionExpired {
+            // セッション切れ: キャッシュを保護し、既存データを維持する
+            print("[KULMS] fetchAll: session expired mid-fetch, preserving cache")
+            isLoggedIn = false
         } catch {
             print("[KULMS] fetchAll error: \(error)")
             errorMessage = error.localizedDescription

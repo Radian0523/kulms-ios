@@ -28,10 +28,15 @@ class WebViewFetcher {
 
         let fullURL = baseURL + path
         let escaped = fullURL.replacingOccurrences(of: "'", with: "\\'")
-        let result = try await webView.callAsyncJavaScript(
-            "const r = await fetch('\(escaped)', {credentials:'include', cache:'no-store'}); if (!r.ok) throw new Error('HTTP '+r.status); return await r.text();",
-            contentWorld: .page
-        )
+        let js = """
+            const r = await fetch('\(escaped)', {credentials:'include', cache:'no-store'});
+            if (r.redirected && /\\/portal\\/(x?login|relogin|logout)/.test(r.url)) throw new Error('SESSION_EXPIRED');
+            var ct = r.headers.get('content-type') || '';
+            if (ct && ct.indexOf('json') === -1) throw new Error('SESSION_EXPIRED');
+            if (!r.ok) throw new Error('HTTP '+r.status);
+            return await r.text();
+            """
+        let result = try await webView.callAsyncJavaScript(js, contentWorld: .page)
 
         guard let text = result as? String, let data = text.data(using: .utf8) else {
             throw NSError(domain: "WebViewFetcher", code: 1, userInfo: [NSLocalizedDescriptionKey: "Empty response"])
@@ -51,7 +56,15 @@ actor SakaiAPIClient {
 
     /// Fetch data via WKWebView's JavaScript fetch (uses authenticated session).
     private func fetchData(path: String) async throws -> Data {
-        try await WebViewFetcher.shared.fetch(path: path)
+        do {
+            return try await WebViewFetcher.shared.fetch(path: path)
+        } catch {
+            // JS の SESSION_EXPIRED を APIError.sessionExpired に変換
+            if error.localizedDescription.contains("SESSION_EXPIRED") {
+                throw APIError.sessionExpired
+            }
+            throw error
+        }
     }
 
     // MARK: - Session
@@ -183,13 +196,28 @@ actor SakaiAPIClient {
         var completed = 0
 
         for batch in courses.chunked(into: concurrentLimit) {
-            let batchResults = await withTaskGroup(
+            let batchResults = try await withThrowingTaskGroup(
                 of: (course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz]).self
             ) { group in
                 for course in batch {
                     group.addTask {
-                        let rawAssignments = (try? await self.fetchAssignments(siteId: course.id)) ?? []
-                        let rawQuizzes = (try? await self.fetchQuizzes(siteId: course.id)) ?? []
+                        let rawAssignments: [RawAssignment]
+                        do {
+                            rawAssignments = try await self.fetchAssignments(siteId: course.id)
+                        } catch is APIError {
+                            throw APIError.sessionExpired // セッション切れは上位に伝播
+                        } catch {
+                            rawAssignments = []
+                        }
+
+                        let rawQuizzes: [RawQuiz]
+                        do {
+                            rawQuizzes = try await self.fetchQuizzes(siteId: course.id)
+                        } catch is APIError {
+                            throw APIError.sessionExpired
+                        } catch {
+                            rawQuizzes = []
+                        }
 
                         // Fetch individual assignment details in parallel
                         let enriched: [AssignmentWithDetail] = await withTaskGroup(of: AssignmentWithDetail.self) { detailGroup in
@@ -213,7 +241,7 @@ actor SakaiAPIClient {
                     }
                 }
                 var collected: [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz])] = []
-                for await result in group {
+                for try await result in group {
                     collected.append(result)
                 }
                 return collected
