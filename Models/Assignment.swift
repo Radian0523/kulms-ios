@@ -102,7 +102,9 @@ final class Assignment {
     var isSubmitted: Bool {
         let s = status.lowercased()
         return s.contains("提出済") || s.contains("submitted")
-            || s.contains("評定済") || s.contains("graded")
+            || s.contains("再提出") || s.contains("resubmitted")
+            || s.contains("評定済") || s.contains("graded") || s.contains("採点済")
+            || s.contains("返却") || s.contains("returned")
     }
 
     var remainingText: String {

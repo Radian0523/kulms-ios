@@ -86,7 +86,7 @@ struct AssignmentCardView: View {
 
     private var statusLabel: String {
         let s = assignment.status.lowercased()
-        if s.contains("評定済") || s.contains("graded") { return "評定済" }
+        if s.contains("評定済") || s.contains("graded") || s.contains("採点済") { return "評定済" }
         if s.contains("提出済") || s.contains("submitted") { return "提出済" }
         return assignment.status
     }

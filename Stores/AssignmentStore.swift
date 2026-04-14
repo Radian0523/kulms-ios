@@ -128,15 +128,32 @@ final class AssignmentStore: ObservableObject {
                     let deadline = raw.dueTime?.date ?? raw.dueDate?.date ?? raw.closeTime?.date
 
                     // Determine status from individual API first
+                    // Sakai status文字列はフローチャート（時間比較含む）に基づく正確な判定。
+                    // Booleanフィールド（graded, returned等）は前回の提出状態が残るため
+                    // 単体では状態#11（返却後に作業中）等を正しく判定できない。
+                    // 参照: kulms-extension/docs/sakai-submission-states.md
                     var status = ""
                     var grade = ""
                     if let submission = detail.submissions.first {
-                        if submission.graded == true {
-                            status = "評定済"
+                        let subStatus = (submission.status ?? "").lowercased()
+                        let statusIndicatesSubmitted =
+                            subStatus.contains("提出済") || subStatus.contains("submitted") ||
+                            subStatus.contains("再提出") || subStatus.contains("resubmitted") ||
+                            subStatus.contains("評定済") || subStatus.contains("graded") ||
+                            subStatus.contains("採点済") ||
+                            subStatus.contains("返却") || subStatus.contains("returned")
+
+                        if statusIndicatesSubmitted {
+                            if submission.graded == true && submission.returned == true {
+                                status = "評定済"
+                            } else {
+                                status = "提出済"
+                            }
                             grade = submission.grade ?? ""
-                        } else if submission.userSubmission == true && submission.draft != true {
+                        } else if submission.userSubmission == true && submission.draft != true && (submission.status ?? "").isEmpty {
                             status = "提出済"
-                        } else if let s = submission.status, s != "未開始" {
+                            if submission.graded == true { grade = submission.grade ?? "" }
+                        } else if let s = submission.status, s != "未開始", s.lowercased() != "not started" {
                             status = s
                         }
                     }

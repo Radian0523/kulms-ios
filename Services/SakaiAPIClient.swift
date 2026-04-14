@@ -172,6 +172,7 @@ actor SakaiAPIClient {
         let userSubmission: Bool?
         let submitted: Bool?
         let draft: Bool?
+        let returned: Bool?
         let status: String?
         let dateSubmittedEpochSeconds: Int64?
     }
