@@ -127,6 +127,7 @@ actor SakaiAPIClient {
 
     struct RawQuiz: Decodable {
         let title: String?
+        let startDate: FlexibleTimestamp?
         let dueDate: FlexibleTimestamp?
         let retractDate: FlexibleTimestamp?
         let submitted: Bool?
@@ -136,8 +137,14 @@ actor SakaiAPIClient {
     func fetchQuizzes(siteId: String) async throws -> [RawQuiz] {
         let data = try await fetchData(path: "/direct/sam_pub/context/\(siteId).json")
         let collection = try JSONDecoder().decode(QuizCollection.self, from: data)
-        print("[KULMS] fetchQuizzes(\(siteId)): \(collection.sam_pub_collection.count) items")
-        return collection.sam_pub_collection
+        // 未公開クイズを除外: startDate が未来のものは非表示 (Comfortable Sakai 準拠)
+        let now = Date()
+        let filtered = collection.sam_pub_collection.filter { quiz in
+            guard let startDate = quiz.startDate?.date else { return true }
+            return startDate <= now
+        }
+        print("[KULMS] fetchQuizzes(\(siteId)): \(collection.sam_pub_collection.count) items, \(filtered.count) published")
+        return filtered
     }
 
     // MARK: - Individual Assignment Detail
