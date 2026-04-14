@@ -201,10 +201,7 @@ final class AssignmentStore: ObservableObject {
                 for quiz in result.quizzes {
                     let deadline = quiz.dueDate?.date ?? quiz.retractDate?.date
 
-                    var status = ""
-                    if quiz.submitted == true {
-                        status = "提出済"
-                    }
+                    let status = ""
 
                     let assignment = Assignment(
                         courseId: course.id,

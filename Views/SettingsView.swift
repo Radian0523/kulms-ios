@@ -14,7 +14,7 @@ struct SettingsView: View {
                 // Auto-complete
                 Section("課題更新") {
                     Toggle("提出状態の自動判定", isOn: $autoComplete)
-                    Text("OFFにすると手動チェックのみで完了判定")
+                    Text("OFFにすると手動チェックのみで完了判定\n※クイズ・テストは手動チェックのみ")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
