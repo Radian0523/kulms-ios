@@ -29,8 +29,8 @@ targets:
         INFOPLIST_KEY_UILaunchScreen_Generation: true
         PRODUCT_BUNDLE_IDENTIFIER: com.kulms.app
         PRODUCT_NAME: "KULMS+"
-        MARKETING_VERSION: "1.0.4"
-        CURRENT_PROJECT_VERSION: "5"
+        MARKETING_VERSION: "1.0.5"
+        CURRENT_PROJECT_VERSION: "6"
         DEVELOPMENT_TEAM: ""
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
