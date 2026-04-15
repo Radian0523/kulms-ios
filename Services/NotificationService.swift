@@ -3,6 +3,10 @@ import UserNotifications
 
 final class NotificationService {
     static let shared = NotificationService()
+    private static let maxPendingNotifications = 64
+    private static let defaultOffsets = [1440, 60] // 24h, 1h (minutes)
+    private static let offsetsKey = "notificationOffsets"
+
     private init() {}
 
     func requestPermission() async -> Bool {
@@ -14,35 +18,98 @@ final class NotificationService {
         }
     }
 
-    /// Schedule 24h-before and 1h-before reminders for unsubmitted assignments.
+    // MARK: - Notification Offsets
+
+    static func loadNotificationOffsets() -> [Int] {
+        guard let data = UserDefaults.standard.data(forKey: offsetsKey),
+              let offsets = try? JSONDecoder().decode([Int].self, from: data),
+              !offsets.isEmpty else {
+            return defaultOffsets
+        }
+        return offsets
+    }
+
+    static func saveNotificationOffsets(_ offsets: [Int]) {
+        let sorted = offsets.sorted(by: >)
+        if let data = try? JSONEncoder().encode(sorted) {
+            UserDefaults.standard.set(data, forKey: offsetsKey)
+        }
+    }
+
+    // MARK: - Schedule Notifications
+
+    /// Schedule reminders at user-configured offsets for unsubmitted assignments.
     func scheduleNotifications(for assignments: [Assignment]) async {
         let center = UNUserNotificationCenter.current()
-        // Remove all existing KULMS notifications
         center.removeAllPendingNotificationRequests()
 
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized else { return }
+
+        let offsets = Self.loadNotificationOffsets()
+
+        // Build all notification candidates, then trim to 64
+        struct NotificationCandidate {
+            let id: String
+            let title: String
+            let body: String
+            let date: Date
+        }
+
+        var candidates: [NotificationCandidate] = []
 
         for assignment in assignments {
             guard let deadline = assignment.deadline,
                   !assignment.isSubmitted,
                   !assignment.isChecked else { continue }
 
-            // 24h before
-            schedule(
-                id: "kulms-24h-\(assignment.compositeKey)",
-                title: "課題の締切が近づいています",
-                body: "「\(assignment.title)」（\(assignment.courseName)）の締切まで24時間",
-                date: deadline.addingTimeInterval(-24 * 3600)
-            )
+            for offset in offsets {
+                let date = deadline.addingTimeInterval(-Double(offset) * 60)
+                guard date > .now else { continue }
 
-            // 1h before
-            schedule(
-                id: "kulms-1h-\(assignment.compositeKey)",
-                title: "課題の締切まもなく",
-                body: "「\(assignment.title)」（\(assignment.courseName)）の締切まで1時間",
-                date: deadline.addingTimeInterval(-3600)
-            )
+                let (title, body) = Self.notificationContent(
+                    for: assignment, offsetMinutes: offset
+                )
+                candidates.append(NotificationCandidate(
+                    id: "kulms-\(offset)m-\(assignment.compositeKey)",
+                    title: title,
+                    body: body,
+                    date: date
+                ))
+            }
+        }
+
+        // Sort by date (nearest first) and limit to 64
+        candidates.sort { $0.date < $1.date }
+        for candidate in candidates.prefix(Self.maxPendingNotifications) {
+            schedule(id: candidate.id, title: candidate.title,
+                     body: candidate.body, date: candidate.date)
+        }
+    }
+
+    // MARK: - Helpers
+
+    static func notificationContent(
+        for assignment: Assignment, offsetMinutes: Int
+    ) -> (title: String, body: String) {
+        let label = formatOffsetLabel(offsetMinutes)
+        let title: String
+        if offsetMinutes <= 60 {
+            title = "課題の締切まもなく"
+        } else {
+            title = "課題の締切が近づいています"
+        }
+        let body = "「\(assignment.title)」（\(assignment.courseName)）の締切まで\(label)"
+        return (title, body)
+    }
+
+    static func formatOffsetLabel(_ minutes: Int) -> String {
+        if minutes >= 1440 && minutes % 1440 == 0 {
+            return "\(minutes / 1440)日"
+        } else if minutes >= 60 && minutes % 60 == 0 {
+            return "\(minutes / 60)時間"
+        } else {
+            return "\(minutes)分"
         }
     }
 
