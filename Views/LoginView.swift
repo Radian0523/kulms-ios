@@ -1,16 +1,44 @@
 import SwiftUI
 import WebKit
 
+/// ログイン画面のルート。
+/// デフォルトでは独自 UI（CredentialLoginView）を表示。
+/// 多要素認証が必要な場合や、ユーザーが明示的に選択した場合は WebView ログイン UI に切り替える。
 struct LoginView: View {
+    @EnvironmentObject private var store: AssignmentStore
+    @State private var useWebView = false
+
+    var body: some View {
+        Group {
+            if useWebView {
+                WebViewLoginPanel(onBack: { useWebView = false })
+            } else {
+                CredentialLoginView(onRequireWebViewLogin: { useWebView = true })
+            }
+        }
+        .onChange(of: store.isLoggedIn) { _, newValue in
+            // セッション切れで再ログインに戻る場合は、credential 入力画面に戻す
+            if newValue == false {
+                useWebView = false
+            }
+        }
+    }
+}
+
+// MARK: - WebView fallback (for 2FA / passkey)
+
+/// 従来の WebView ベースのログイン UI（多要素認証用フォールバック）。
+struct WebViewLoginPanel: View {
     @EnvironmentObject private var store: AssignmentStore
     @State private var isVerifying = false
     @State private var errorText: String?
+
+    let onBack: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             SSOWebView()
 
-            // Bottom bar with login button
             VStack(spacing: 8) {
                 if let error = errorText {
                     Text(error)
@@ -39,19 +67,16 @@ struct LoginView: View {
                 .controlSize(.large)
                 .disabled(isVerifying)
 
-                Text("SSOログイン後にタップしてください")
+                Text("認証完了後にタップしてください")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+
+                Button("ID/パスワード入力に戻る", action: onBack)
+                    .font(.caption)
+                    .disabled(isVerifying)
             }
             .padding()
             .background(.bar)
-        }
-        .onChange(of: store.isLoggedIn) { _, newValue in
-            if !newValue {
-                // Session expired — reload portal to trigger SSO redirect
-                let url = URL(string: "https://lms.gakusei.kyoto-u.ac.jp/portal")!
-                WebViewFetcher.shared.webView.load(URLRequest(url: url))
-            }
         }
     }
 
@@ -73,7 +98,6 @@ struct LoginView: View {
 
                 if text.contains("site_collection") && text.count > 60 {
                     store.isLoggedIn = true
-                    // Auto-fetch assignments after login
                     await store.fetchAll(forceRefresh: true)
                 } else {
                     errorText = "セッションが確認できません。ログインしてから再度タップしてください。"
@@ -94,8 +118,12 @@ struct SSOWebView: UIViewRepresentable {
         let wv = WebViewFetcher.shared.webView
         wv.allowsBackForwardNavigationGestures = true
 
-        let url = URL(string: "https://lms.gakusei.kyoto-u.ac.jp/portal")!
-        wv.load(URLRequest(url: url))
+        // 既に IIMC 認証画面に遷移している可能性が高いので、その状態を保つ。
+        // セッション切れで初回表示の場合のみ portal をロードする。
+        if wv.url == nil {
+            let url = URL(string: "https://lms.gakusei.kyoto-u.ac.jp/portal")!
+            wv.load(URLRequest(url: url))
+        }
 
         return wv
     }

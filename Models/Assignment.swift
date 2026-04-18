@@ -15,6 +15,7 @@ final class Assignment {
     var cachedAt: Date
     var itemType: String = "assignment"
     var entityId: String = ""
+    var closeTime: Date?
 
     init(
         courseId: String,
@@ -22,6 +23,7 @@ final class Assignment {
         title: String,
         url: String = "",
         deadline: Date? = nil,
+        closeTime: Date? = nil,
         status: String = "",
         grade: String = "",
         isChecked: Bool = false,
@@ -35,6 +37,7 @@ final class Assignment {
         self.title = title
         self.url = url
         self.deadline = deadline
+        self.closeTime = closeTime
         self.status = status
         self.grade = grade
         self.isChecked = isChecked
@@ -110,12 +113,16 @@ final class Assignment {
     var remainingText: String {
         guard let deadline else { return "" }
         let diff = deadline.timeIntervalSinceNow
-        if diff < 0 { return "期限切れ" }
+        if diff < 0 {
+            // 締切過ぎ: closeTime が未過ぎなら再提出受付期間
+            if let ct = closeTime, ct.timeIntervalSinceNow > 0 { return "再提出受付期間" }
+            return "期限切れ"
+        }
         let days = Int(diff / (24 * 3600))
         let hours = Int(diff.truncatingRemainder(dividingBy: 24 * 3600) / 3600)
-        if days > 0 { return "残り\(days)日\(hours)時間" }
-        if hours > 0 { return "残り\(hours)時間" }
-        let mins = Int(diff / 60)
+        let mins = Int(diff.truncatingRemainder(dividingBy: 3600) / 60)
+        if days > 0 { return "残り\(days)日\(hours)時間\(mins)分" }
+        if hours > 0 { return "残り\(hours)時間\(mins)分" }
         return "残り\(mins)分"
     }
 

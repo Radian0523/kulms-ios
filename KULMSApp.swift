@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import BackgroundTasks
 import UserNotifications
+import WebKit
 
 @main
 struct KULMSApp: App {
@@ -92,6 +93,7 @@ struct KULMSApp: App {
                             courseName: result.course.name,
                             title: raw.title ?? "",
                             deadline: deadline,
+                            closeTime: raw.closeTime?.date,
                             status: status,
                             grade: raw.gradeDisplay ?? raw.grade ?? "",
                             entityId: raw.assignmentId ?? ""
@@ -138,16 +140,15 @@ struct ContentView: View {
     @EnvironmentObject private var store: AssignmentStore
 
     var body: some View {
-        ZStack {
-            // Both views always exist. LoginView keeps the WKWebView alive.
-            // zIndex controls which is on top.
-            LoginView()
-                .zIndex(store.isLoggedIn ? 0 : 1)
-                .allowsHitTesting(!store.isLoggedIn)
-
-            AssignmentListView()
-                .zIndex(store.isLoggedIn ? 1 : 0)
-                .allowsHitTesting(store.isLoggedIn)
+        // ログイン状態で画面を完全に切り替える（重ねない）。
+        // 共有 WKWebView は各画面（CredentialLoginView / AssignmentListView）が
+        // それぞれ HiddenWebView で view hierarchy に保持する。
+        Group {
+            if store.isLoggedIn {
+                AssignmentListView()
+            } else {
+                LoginView()
+            }
         }
     }
 }

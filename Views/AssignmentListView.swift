@@ -1,4 +1,5 @@
 import SwiftUI
+import WebKit
 
 struct AssignmentListView: View {
     @EnvironmentObject private var store: AssignmentStore
@@ -7,6 +8,13 @@ struct AssignmentListView: View {
     var body: some View {
         NavigationStack {
             ZStack {
+                // Sakai API 呼び出し（JS 実行 / 認証 cookie）のため、
+                // WKWebView を常に view hierarchy 内に保持する（不可視）。
+                HiddenWebView()
+                    .frame(width: 1, height: 1)
+                    .opacity(0)
+                    .allowsHitTesting(false)
+
                 if store.isLoading && store.assignments.isEmpty {
                     loadingView
                 } else if let error = store.errorMessage, store.assignments.isEmpty {
@@ -92,19 +100,33 @@ struct AssignmentListView: View {
             }
 
             ForEach(sections) { section in
+                let isCollapsed = store.collapsedSections.contains(section.id)
                 Section {
-                    ForEach(section.assignments, id: \.compositeKey) { assignment in
-                        AssignmentCardView(assignment: assignment)
+                    if !isCollapsed {
+                        ForEach(section.assignments, id: \.compositeKey) { assignment in
+                            AssignmentCardView(assignment: assignment)
+                        }
                     }
                 } header: {
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(Color(hex: section.colorHex))
-                            .frame(width: 8, height: 8)
-                        Text(section.label)
-                        Text("(\(section.assignments.count))")
-                            .foregroundStyle(.secondary)
+                    Button {
+                        withAnimation {
+                            store.toggleSection(section.id)
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(Color(hex: section.colorHex))
+                                .frame(width: 8, height: 8)
+                            Text(section.label)
+                            Text("(\(section.assignments.count))")
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -147,6 +169,18 @@ struct AssignmentListView: View {
         }
         .padding()
     }
+}
+
+// MARK: - Hidden WKWebView wrapper
+
+/// 共有 WKWebView を view hierarchy 内に保持する（不可視）。
+/// ログイン後の Sakai API 呼び出し（JS fetch）を確実に動作させるため。
+private struct HiddenWebView: UIViewRepresentable {
+    func makeUIView(context: Context) -> WKWebView {
+        WebViewFetcher.shared.webView
+    }
+
+    func updateUIView(_ uiView: WKWebView, context: Context) {}
 }
 
 // MARK: - Color Extension

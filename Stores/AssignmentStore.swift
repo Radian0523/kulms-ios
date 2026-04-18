@@ -10,9 +10,35 @@ final class AssignmentStore: ObservableObject {
     @Published var progress: (completed: Int, total: Int)?
     @Published var isLoggedIn = true
     @Published var errorMessage: String?
+    @Published var collapsedSections: Set<String>
 
     private let cacheTTL: TimeInterval = 30 * 60  // 30 min
     private var modelContext: ModelContext?
+
+    init() {
+        // Load collapsed sections from UserDefaults, default to ["completed"]
+        if let data = UserDefaults.standard.data(forKey: "collapsedSections"),
+           let ids = try? JSONDecoder().decode([String].self, from: data) {
+            self.collapsedSections = Set(ids)
+        } else {
+            self.collapsedSections = ["completed"]
+        }
+    }
+
+    func toggleSection(_ id: String) {
+        if collapsedSections.contains(id) {
+            collapsedSections.remove(id)
+        } else {
+            collapsedSections.insert(id)
+        }
+        saveCollapsedSections()
+    }
+
+    private func saveCollapsedSections() {
+        if let data = try? JSONEncoder().encode(Array(collapsedSections)) {
+            UserDefaults.standard.set(data, forKey: "collapsedSections")
+        }
+    }
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
@@ -180,12 +206,15 @@ final class AssignmentStore: ObservableObject {
                         assignUrl = "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)"
                     }
 
+                    let closeTime = raw.closeTime?.date
+
                     let assignment = Assignment(
                         courseId: course.id,
                         courseName: course.name,
                         title: raw.title ?? "",
                         url: assignUrl,
                         deadline: deadline,
+                        closeTime: closeTime,
                         status: status,
                         grade: grade,
                         entityId: raw.assignmentId ?? ""
@@ -209,6 +238,7 @@ final class AssignmentStore: ObservableObject {
                         title: quiz.title ?? "",
                         url: "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)",
                         deadline: deadline,
+                        closeTime: quiz.retractDate?.date,
                         status: status,
                         itemType: "quiz",
                         entityId: quiz.publishedAssessmentId.map { String($0) } ?? ""
@@ -278,7 +308,10 @@ final class AssignmentStore: ObservableObject {
                 HTTPCookieStorage.shared.deleteCookie(cookie)
             }
         }
-        // Clear WebView cookies via WKWebsiteDataStore is handled in LoginView
+        // Clear WebView cookies/data
+        Task { await WebViewFetcher.shared.clearAllData() }
+        // Clear stored credentials
+        CredentialStore.clear()
         assignments = []
         lastRefreshed = nil
         isLoggedIn = false

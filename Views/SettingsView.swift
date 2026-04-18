@@ -70,8 +70,8 @@ struct SettingsView: View {
                     Link(destination: URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSdmc4tCHa98mzt1j4Wxu9IJo88wKz3-VQHVYAQjbtJ3Jo_CPw/viewform")!) {
                         Label("ご意見・要望を送る", systemImage: "envelope")
                     }
-                    Link(destination: URL(string: "https://ko-fi.com/radian0523")!) {
-                        Label("開発を応援する", systemImage: "cup.and.saucer")
+                    Link(destination: URL(string: "https://radian0523.github.io/kulms-extension/")!) {
+                        Label("ホームページ", systemImage: "globe")
                     }
                 }
 
