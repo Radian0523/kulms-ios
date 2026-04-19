@@ -57,11 +57,11 @@ final class AssignmentStore: ObservableObject {
         let autoComplete = true
         let now = Date()
 
-        // Hide completed + closed (closeTime past)
+        // 自動判定で完了 + 期限切れのみ非表示（手動チェック済みは常に表示）
         let visible = assignments.filter { a in
-            let isCompleted = a.isChecked || (autoComplete && a.isSubmitted)
+            let isAutoCompleted = autoComplete && a.isSubmitted
             let isClosed = a.closeTime != nil && a.closeTime! < now
-            return !(isCompleted && isClosed)
+            return !(isAutoCompleted && isClosed)
         }
 
         let active = visible.filter { a in !(a.isChecked || (autoComplete && a.isSubmitted)) }
