@@ -95,21 +95,31 @@ final class NotificationService {
         let label = formatOffsetLabel(offsetMinutes)
         let title: String
         if offsetMinutes <= 60 {
-            title = "課題の締切まもなく"
+            title = String(localized: "notifTitleSoon")
         } else {
-            title = "課題の締切が近づいています"
+            title = String(localized: "notifTitleApproaching")
         }
-        let body = "「\(assignment.title)」（\(assignment.courseName)）の締切まで\(label)"
+        let body = String(format: String(localized: "notifBody"), assignment.title, assignment.courseName, label)
         return (title, body)
     }
 
     static func formatOffsetLabel(_ minutes: Int) -> String {
         if minutes >= 1440 && minutes % 1440 == 0 {
-            return "\(minutes / 1440)日"
+            return String(format: String(localized: "offsetDays"), minutes / 1440)
         } else if minutes >= 60 && minutes % 60 == 0 {
-            return "\(minutes / 60)時間"
+            return String(format: String(localized: "offsetHours"), minutes / 60)
         } else {
-            return "\(minutes)分"
+            return String(format: String(localized: "offsetMins"), minutes)
+        }
+    }
+
+    static func formatOffsetChipLabel(_ minutes: Int) -> String {
+        if minutes >= 1440 && minutes % 1440 == 0 {
+            return String(format: String(localized: "offsetDaysBefore"), minutes / 1440)
+        } else if minutes >= 60 && minutes % 60 == 0 {
+            return String(format: String(localized: "offsetHoursBefore"), minutes / 60)
+        } else {
+            return String(format: String(localized: "offsetMinsBefore"), minutes)
         }
     }
 

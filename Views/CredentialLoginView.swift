@@ -42,7 +42,7 @@ struct CredentialLoginView: View {
                     Text("KULMS+")
                         .font(.largeTitle)
                         .fontWeight(.bold)
-                    Text("京都大学 学習支援システム")
+                    Text(String(localized: "loginSubtitle"))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -51,7 +51,7 @@ struct CredentialLoginView: View {
                 VStack(alignment: .leading, spacing: 16) {
                     // Username
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("ECS-ID / SPS-ID")
+                        Text(String(localized: "labelUsername"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         TextField("a0123456", text: $username)
@@ -70,18 +70,18 @@ struct CredentialLoginView: View {
 
                     // Password
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("パスワード")
+                        Text(String(localized: "labelPassword"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
                         HStack {
                             Group {
                                 if passwordVisible {
-                                    TextField("パスワード", text: $password)
+                                    TextField(String(localized: "labelPassword"), text: $password)
                                         .textContentType(.password)
                                         .textInputAutocapitalization(.never)
                                         .autocorrectionDisabled()
                                 } else {
-                                    SecureField("パスワード", text: $password)
+                                    SecureField(String(localized: "labelPassword"), text: $password)
                                         .textContentType(.password)
                                 }
                             }
@@ -104,7 +104,7 @@ struct CredentialLoginView: View {
 
                     // Save password toggle
                     Toggle(isOn: $savePassword) {
-                        Text("この端末にパスワードを保存（暗号化）")
+                        Text(String(localized: "savePassword"))
                             .font(.subheadline)
                     }
                     .disabled(isSubmitting)
@@ -126,11 +126,11 @@ struct CredentialLoginView: View {
                                 ProgressView()
                                     .controlSize(.small)
                                     .tint(.white)
-                                Text("ログイン中...")
+                                Text(String(localized: "loggingIn"))
                             }
                             .frame(maxWidth: .infinity)
                         } else {
-                            Text("ログイン")
+                            Text(String(localized: "login"))
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                         }
@@ -147,11 +147,11 @@ struct CredentialLoginView: View {
                     Button {
                         onRequireWebViewLogin()
                     } label: {
-                        Text("Web ブラウザでログイン")
+                        Text(String(localized: "loginBrowser"))
                     }
                     .disabled(isSubmitting)
 
-                    Text("（パスキー / 多要素認証を使う場合）")
+                    Text(String(localized: "loginBrowserDesc"))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

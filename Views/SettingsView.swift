@@ -4,38 +4,29 @@ import WebKit
 struct SettingsView: View {
     @EnvironmentObject private var store: AssignmentStore
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("autoComplete") private var autoComplete = true
     @State private var notificationsEnabled = false
     @State private var showLogoutConfirm = false
     @State private var notificationOffsets: [Int] = NotificationService.loadNotificationOffsets()
     @State private var showOffsetPicker = false
 
-    private static let presetOffsets: [(label: String, minutes: Int)] = [
-        ("10分前", 10),
-        ("30分前", 30),
-        ("1時間前", 60),
-        ("3時間前", 180),
-        ("5時間前", 300),
-        ("12時間前", 720),
-        ("24時間前", 1440),
-        ("2日前", 2880),
-        ("3日前", 4320),
+    private static let presetOffsets: [(labelKey: String, minutes: Int)] = [
+        ("offset10m", 10),
+        ("offset30m", 30),
+        ("offset1h", 60),
+        ("offset3h", 180),
+        ("offset5h", 300),
+        ("offset12h", 720),
+        ("offset24h", 1440),
+        ("offset2d", 2880),
+        ("offset3d", 4320),
     ]
 
     var body: some View {
         NavigationStack {
             List {
-                // Auto-complete
-                Section("課題更新") {
-                    Toggle("提出状態の自動判定", isOn: $autoComplete)
-                    Text("OFFにすると手動チェックのみで完了判定\n※クイズ・テストは手動チェックのみ")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
                 // Notifications
-                Section("通知") {
-                    Toggle("締切リマインド", isOn: $notificationsEnabled)
+                Section(String(localized: "sectionNotifications")) {
+                    Toggle(String(localized: "deadlineRemind"), isOn: $notificationsEnabled)
                         .onChange(of: notificationsEnabled) { _, newValue in
                             if newValue {
                                 Task {
@@ -52,14 +43,14 @@ struct SettingsView: View {
                 }
 
                 // Info
-                Section("情報") {
+                Section(String(localized: "sectionInfo")) {
                     if let last = store.lastRefreshed {
-                        LabeledContent("最終更新") {
+                        LabeledContent(String(localized: "lastUpdated")) {
                             Text(last, style: .relative)
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    LabeledContent("課題数") {
+                    LabeledContent(String(localized: "assignmentCount")) {
                         Text("\(store.assignments.count)")
                             .foregroundStyle(.secondary)
                     }
@@ -68,10 +59,10 @@ struct SettingsView: View {
                 // Feedback & Support
                 Section {
                     Link(destination: URL(string: "https://docs.google.com/forms/d/e/1FAIpQLSdmc4tCHa98mzt1j4Wxu9IJo88wKz3-VQHVYAQjbtJ3Jo_CPw/viewform")!) {
-                        Label("ご意見・要望を送る", systemImage: "envelope")
+                        Label(String(localized: "sendFeedback"), systemImage: "envelope")
                     }
                     Link(destination: URL(string: "https://radian0523.github.io/kulms-extension/")!) {
-                        Label("ホームページ", systemImage: "globe")
+                        Label(String(localized: "homepage"), systemImage: "globe")
                     }
                 }
 
@@ -82,26 +73,26 @@ struct SettingsView: View {
                     } label: {
                         HStack {
                             Spacer()
-                            Text("ログアウト")
+                            Text(String(localized: "logout"))
                             Spacer()
                         }
                     }
                 }
             }
-            .navigationTitle("設定")
+            .navigationTitle(String(localized: "settings"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("閉じる") { dismiss() }
+                    Button(String(localized: "close")) { dismiss() }
                 }
             }
-            .confirmationDialog("ログアウトしますか？", isPresented: $showLogoutConfirm) {
-                Button("ログアウト", role: .destructive) {
+            .confirmationDialog(String(localized: "logoutConfirm"), isPresented: $showLogoutConfirm) {
+                Button(String(localized: "logout"), role: .destructive) {
                     performLogout()
                 }
-                Button("キャンセル", role: .cancel) {}
+                Button(String(localized: "cancel"), role: .cancel) {}
             } message: {
-                Text("セッションとキャッシュが削除されます")
+                Text(String(localized: "logoutConfirmBody"))
             }
             .task {
                 let settings = await UNUserNotificationCenter.current().notificationSettings()
@@ -114,7 +105,7 @@ struct SettingsView: View {
 
     private var notificationTimingSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("通知タイミング")
+            Text(String(localized: "notificationTiming"))
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
             FlowLayout(spacing: 8) {
@@ -125,7 +116,7 @@ struct SettingsView: View {
                     Button {
                         showOffsetPicker = true
                     } label: {
-                        Label("追加", systemImage: "plus")
+                        Label(String(localized: "add"), systemImage: "plus")
                             .font(.subheadline)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
@@ -135,18 +126,18 @@ struct SettingsView: View {
                 }
             }
         }
-        .confirmationDialog("通知タイミングを追加", isPresented: $showOffsetPicker) {
+        .confirmationDialog(String(localized: "addTiming"), isPresented: $showOffsetPicker) {
             ForEach(availablePresets, id: \.minutes) { preset in
-                Button(preset.label) {
+                Button(String(localized: String.LocalizationValue(preset.labelKey))) {
                     addOffset(preset.minutes)
                 }
             }
-            Button("キャンセル", role: .cancel) {}
+            Button(String(localized: "cancel"), role: .cancel) {}
         }
     }
 
     private func offsetChip(_ minutes: Int) -> some View {
-        let label = NotificationService.formatOffsetLabel(minutes) + "前"
+        let label = NotificationService.formatOffsetChipLabel(minutes)
         let canDelete = notificationOffsets.count > 1
         return HStack(spacing: 4) {
             Text(label)
@@ -168,7 +159,7 @@ struct SettingsView: View {
         .clipShape(Capsule())
     }
 
-    private var availablePresets: [(label: String, minutes: Int)] {
+    private var availablePresets: [(labelKey: String, minutes: Int)] {
         Self.presetOffsets.filter { !notificationOffsets.contains($0.minutes) }
     }
 

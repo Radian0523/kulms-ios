@@ -16,6 +16,7 @@ final class Assignment {
     var itemType: String = "assignment"
     var entityId: String = ""
     var closeTime: Date?
+    var allowResubmission: Bool = false
 
     init(
         courseId: String,
@@ -29,7 +30,8 @@ final class Assignment {
         isChecked: Bool = false,
         cachedAt: Date = .now,
         itemType: String = "assignment",
-        entityId: String = ""
+        entityId: String = "",
+        allowResubmission: Bool = false
     ) {
         self.compositeKey = "\(courseId):\(itemType):\(title)"
         self.courseId = courseId
@@ -44,6 +46,7 @@ final class Assignment {
         self.cachedAt = cachedAt
         self.itemType = itemType
         self.entityId = entityId
+        self.allowResubmission = allowResubmission
     }
 
     // MARK: - Urgency
@@ -71,11 +74,11 @@ final class Assignment {
 
         var label: String {
             switch self {
-            case .overdue: return "期限切れ"
-            case .danger:  return "緊急"
-            case .warning: return "5日以内"
-            case .success: return "14日以内"
-            case .other:   return "その他"
+            case .overdue: return String(localized: "sectionOverdue")
+            case .danger:  return String(localized: "sectionDanger")
+            case .warning: return String(localized: "sectionWarning")
+            case .success: return String(localized: "sectionSuccess")
+            case .other:   return String(localized: "sectionOther")
             }
         }
 
@@ -115,15 +118,15 @@ final class Assignment {
         let diff = deadline.timeIntervalSinceNow
         if diff < 0 {
             // 締切過ぎ: closeTime が未過ぎなら再提出受付期間
-            if let ct = closeTime, ct.timeIntervalSinceNow > 0 { return "再提出受付期間" }
-            return "期限切れ"
+            if let ct = closeTime, ct.timeIntervalSinceNow > 0 { return String(localized: "resubmitPeriod") }
+            return String(localized: "expired")
         }
         let days = Int(diff / (24 * 3600))
         let hours = Int(diff.truncatingRemainder(dividingBy: 24 * 3600) / 3600)
         let mins = Int(diff.truncatingRemainder(dividingBy: 3600) / 60)
-        if days > 0 { return "残り\(days)日\(hours)時間\(mins)分" }
-        if hours > 0 { return "残り\(hours)時間\(mins)分" }
-        return "残り\(mins)分"
+        if days > 0 { return String(format: String(localized: "remainDaysHoursMins"), days, hours, mins) }
+        if hours > 0 { return String(format: String(localized: "remainHoursMins"), hours, mins) }
+        return String(format: String(localized: "remainMins"), mins)
     }
 
     var deadlineText: String {

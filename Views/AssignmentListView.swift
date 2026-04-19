@@ -23,7 +23,7 @@ struct AssignmentListView: View {
                     listContent
                 }
             }
-            .navigationTitle("課題一覧")
+            .navigationTitle(String(localized: "assignmentList"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -85,12 +85,12 @@ struct AssignmentListView: View {
             if sections.isEmpty && !store.isLoading {
                 Section {
                     VStack(spacing: 12) {
-                        Text("課題が見つかりませんでした")
+                        Text(String(localized: "noAssignments"))
                             .foregroundStyle(.secondary)
                         Button {
                             Task { await store.fetchAll(forceRefresh: true) }
                         } label: {
-                            Label("再取得", systemImage: "arrow.clockwise")
+                            Label(String(localized: "refetch"), systemImage: "arrow.clockwise")
                         }
                         .buttonStyle(.borderedProminent)
                     }
@@ -104,7 +104,10 @@ struct AssignmentListView: View {
                 Section {
                     if !isCollapsed {
                         ForEach(section.assignments, id: \.compositeKey) { assignment in
-                            AssignmentCardView(assignment: assignment)
+                            AssignmentCardView(
+                                assignment: assignment,
+                                isResubmitActive: section.id != "completed" && assignment.isSubmitted
+                            )
                         }
                     }
                 } header: {
@@ -143,10 +146,10 @@ struct AssignmentListView: View {
             ProgressView()
                 .controlSize(.large)
             if let p = store.progress {
-                Text("課題を取得中... (\(p.completed)/\(p.total))")
+                Text(String(format: String(localized: "loadingAssignments"), p.completed, p.total))
                     .foregroundStyle(.secondary)
             } else {
-                Text("コース情報を取得中...")
+                Text(String(localized: "loadingCourses"))
                     .foregroundStyle(.secondary)
             }
         }
@@ -162,7 +165,7 @@ struct AssignmentListView: View {
             Text(message)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("再試行") {
+            Button(String(localized: "retry")) {
                 Task { await store.fetchAll(forceRefresh: true) }
             }
             .buttonStyle(.borderedProminent)

@@ -54,11 +54,11 @@ struct WebViewLoginPanel: View {
                             ProgressView()
                                 .controlSize(.small)
                                 .tint(.white)
-                            Text("認証を確認中...")
+                            Text(String(localized: "verifying"))
                         }
                         .frame(maxWidth: .infinity)
                     } else {
-                        Text("ログイン完了 → 課題一覧へ")
+                        Text(String(localized: "loginDone"))
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
                     }
@@ -67,11 +67,11 @@ struct WebViewLoginPanel: View {
                 .controlSize(.large)
                 .disabled(isVerifying)
 
-                Text("認証完了後にタップしてください")
+                Text(String(localized: "tapAfterAuth"))
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
-                Button("ID/パスワード入力に戻る", action: onBack)
+                Button(String(localized: "backToCredentials"), action: onBack)
                     .font(.caption)
                     .disabled(isVerifying)
             }
@@ -100,11 +100,11 @@ struct WebViewLoginPanel: View {
                     store.isLoggedIn = true
                     await store.fetchAll(forceRefresh: true)
                 } else {
-                    errorText = "セッションが確認できません。ログインしてから再度タップしてください。"
+                    errorText = String(localized: "sessionNotConfirmed")
                 }
             } catch {
                 print("[KULMS] login: fetch error: \(error)")
-                errorText = "確認に失敗しました: \(error.localizedDescription)"
+                errorText = String(format: String(localized: "verificationFailed"), error.localizedDescription)
             }
             isVerifying = false
         }

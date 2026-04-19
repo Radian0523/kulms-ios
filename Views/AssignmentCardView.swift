@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AssignmentCardView: View {
     let assignment: Assignment
+    var isResubmitActive: Bool = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
@@ -18,7 +19,7 @@ struct AssignmentCardView: View {
                         .clipShape(Capsule())
 
                     if assignment.itemType == "quiz" {
-                        Text("テスト")
+                        Text(String(localized: "badgeQuiz"))
                             .font(.caption2.bold())
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -52,15 +53,40 @@ struct AssignmentCardView: View {
                     }
                 }
 
-                // Status badge
-                if assignment.isSubmitted {
-                    Text(statusLabel)
-                        .font(.caption2)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 1)
-                        .background(Color.green.opacity(0.12))
-                        .foregroundStyle(.green)
-                        .clipShape(Capsule())
+                // Status badge (shown for all submitted)
+                // Resubmission badge (only when resubmitActive — matches extension's _resubmitActive)
+                if assignment.isSubmitted || isResubmitActive {
+                    HStack(spacing: 4) {
+                        if assignment.isSubmitted {
+                            Text(statusLabel)
+                                .font(.caption2)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 1)
+                                .background(Color.green.opacity(0.12))
+                                .foregroundStyle(.green)
+                                .clipShape(Capsule())
+                        }
+
+                        if isResubmitActive {
+                            if assignment.allowResubmission {
+                                Text(String(localized: "badgeResubmit"))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(Color.green.opacity(0.12))
+                                    .foregroundStyle(.green)
+                                    .clipShape(Capsule())
+                            } else {
+                                Text(String(localized: "badgeNoResubmit"))
+                                    .font(.caption2)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 1)
+                                    .background(Color.gray.opacity(0.12))
+                                    .foregroundStyle(.gray)
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
                 }
             }
 
@@ -86,8 +112,8 @@ struct AssignmentCardView: View {
 
     private var statusLabel: String {
         let s = assignment.status.lowercased()
-        if s.contains("評定済") || s.contains("graded") || s.contains("採点済") { return "評定済" }
-        if s.contains("提出済") || s.contains("submitted") { return "提出済" }
+        if s.contains("評定済") || s.contains("graded") || s.contains("採点済") { return String(localized: "statusGraded") }
+        if s.contains("提出済") || s.contains("submitted") { return String(localized: "statusSubmitted") }
         return assignment.status
     }
 }

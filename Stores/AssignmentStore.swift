@@ -54,16 +54,20 @@ final class AssignmentStore: ObservableObject {
     }
 
     var groupedAssignments: [GroupedSection] {
-        let autoComplete = UserDefaults.standard.object(forKey: "autoComplete") as? Bool ?? true
+        let autoComplete = true
+        let now = Date()
 
-        // Hide overdue + completed (submitted or checked)
+        // Hide completed + closed (closeTime past)
         let visible = assignments.filter { a in
             let isCompleted = a.isChecked || (autoComplete && a.isSubmitted)
-            return !(a.urgency == .overdue && isCompleted)
+            let isClosed = a.closeTime != nil && a.closeTime! < now
+            return !(isCompleted && isClosed)
         }
 
         let active = visible.filter { a in !(a.isChecked || (autoComplete && a.isSubmitted)) }
-        let completed = visible.filter { a in a.isChecked || (autoComplete && a.isSubmitted) }
+        let completed = visible
+            .filter { a in a.isChecked || (autoComplete && a.isSubmitted) }
+            .sorted { ($0.deadline ?? .distantPast) > ($1.deadline ?? .distantPast) }
 
         let sorted = active.sorted { a, b in
             guard let da = a.deadline else { return false }
@@ -79,22 +83,22 @@ final class AssignmentStore: ObservableObject {
 
         var sections: [GroupedSection] = []
         if !overdue.isEmpty {
-            sections.append(GroupedSection(id: "overdue", label: "遅延提出", colorHex: "#e85555", assignments: overdue))
+            sections.append(GroupedSection(id: "overdue", label: String(localized: "sectionOverdue"), colorHex: "#e85555", assignments: overdue))
         }
         if !danger.isEmpty {
-            sections.append(GroupedSection(id: "danger", label: "緊急", colorHex: "#e85555", assignments: danger))
+            sections.append(GroupedSection(id: "danger", label: String(localized: "sectionDanger"), colorHex: "#e85555", assignments: danger))
         }
         if !warning.isEmpty {
-            sections.append(GroupedSection(id: "warning", label: "5日以内", colorHex: "#d7aa57", assignments: warning))
+            sections.append(GroupedSection(id: "warning", label: String(localized: "sectionWarning"), colorHex: "#d7aa57", assignments: warning))
         }
         if !success.isEmpty {
-            sections.append(GroupedSection(id: "success", label: "14日以内", colorHex: "#62b665", assignments: success))
+            sections.append(GroupedSection(id: "success", label: String(localized: "sectionSuccess"), colorHex: "#62b665", assignments: success))
         }
         if !other.isEmpty {
-            sections.append(GroupedSection(id: "other", label: "その他", colorHex: "#777777", assignments: other))
+            sections.append(GroupedSection(id: "other", label: String(localized: "sectionOther"), colorHex: "#777777", assignments: other))
         }
         if !completed.isEmpty {
-            sections.append(GroupedSection(id: "completed", label: "完了済み", colorHex: "#777777", assignments: completed))
+            sections.append(GroupedSection(id: "completed", label: String(localized: "sectionCompleted"), colorHex: "#777777", assignments: completed))
         }
         return sections
     }
@@ -143,10 +147,15 @@ final class AssignmentStore: ObservableObject {
 
             // Build Assignment objects
             var newAssignments: [Assignment] = []
-            let existingChecked = Set(assignments.filter(\.isChecked).map(\.compositeKey))
+            let checkedAssignments = assignments.filter(\.isChecked)
+            let existingChecked = Set(checkedAssignments.map(\.compositeKey))
+            // Legacy key fallback: old format was "courseId:itemType:title"
+            let legacyChecked = Set(checkedAssignments.map { "\($0.courseId):\($0.itemType):\($0.title)" })
 
             for result in results {
                 let course = result.course
+                let courseAssignUrl = result.assignmentToolUrl
+                    ?? "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)"
 
                 // Process assignments
                 for detail in result.assignments {
@@ -160,7 +169,8 @@ final class AssignmentStore: ObservableObject {
                     // 参照: kulms-extension/docs/sakai-submission-states.md
                     var status = ""
                     var grade = ""
-                    if let submission = detail.submissions.first {
+                    let submission = detail.submissions.first
+                    if let submission {
                         let subStatus = (submission.status ?? "").lowercased()
                         let statusIndicatesSubmitted =
                             subStatus.contains("提出済") || subStatus.contains("submitted") ||
@@ -195,32 +205,38 @@ final class AssignmentStore: ObservableObject {
                         grade = raw.gradeDisplay ?? raw.grade ?? ""
                     }
 
-                    let assignUrl: String
-                    if let entityURL = raw.entityURL {
-                        if entityURL.hasPrefix("http") {
-                            assignUrl = entityURL
-                        } else {
-                            assignUrl = "https://lms.gakusei.kyoto-u.ac.jp\(entityURL)"
-                        }
+                    // allowResubmission: check both list API and individual API
+                    let allowResubFlag = raw.allowResubmission == true || detail.itemAllowResubmission == true
+                    let allowResub: Bool
+                    if !allowResubFlag {
+                        allowResub = false
                     } else {
-                        assignUrl = "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)"
+                        let remain = submission?.properties?["allow_resubmit_number"]?.stringValue
+                        allowResub = remain != "0"
                     }
 
                     let closeTime = raw.closeTime?.date
+                    let entityId = raw.assignmentId ?? ""
+                    let title = raw.title ?? ""
 
                     let assignment = Assignment(
                         courseId: course.id,
                         courseName: course.name,
-                        title: raw.title ?? "",
-                        url: assignUrl,
+                        title: title,
+                        url: courseAssignUrl,
                         deadline: deadline,
                         closeTime: closeTime,
                         status: status,
                         grade: grade,
-                        entityId: raw.assignmentId ?? ""
+                        entityId: entityId,
+                        allowResubmission: allowResub
                     )
+                    // compositeKey: entityId-based (matching extension's getCheckedKey)
+                    assignment.compositeKey = entityId.isEmpty ? "\(course.id):\(title)" : entityId
 
-                    if existingChecked.contains(assignment.compositeKey) {
+                    // Preserve checked state (with legacy key fallback)
+                    if existingChecked.contains(assignment.compositeKey)
+                        || legacyChecked.contains("\(course.id):assignment:\(title)") {
                         assignment.isChecked = true
                     }
                     newAssignments.append(assignment)
@@ -231,20 +247,26 @@ final class AssignmentStore: ObservableObject {
                     let deadline = quiz.dueDate?.date ?? quiz.retractDate?.date
 
                     let status = ""
+                    let entityId = quiz.publishedAssessmentId.map { String($0) } ?? ""
+                    let title = quiz.title ?? ""
 
                     let assignment = Assignment(
                         courseId: course.id,
                         courseName: course.name,
-                        title: quiz.title ?? "",
+                        title: title,
                         url: "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(course.id)",
                         deadline: deadline,
                         closeTime: quiz.retractDate?.date,
                         status: status,
                         itemType: "quiz",
-                        entityId: quiz.publishedAssessmentId.map { String($0) } ?? ""
+                        entityId: entityId
                     )
+                    // compositeKey: entityId-based (matching extension's getCheckedKey)
+                    assignment.compositeKey = entityId.isEmpty ? "\(course.id):\(title)" : entityId
 
-                    if existingChecked.contains(assignment.compositeKey) {
+                    // Preserve checked state (with legacy key fallback)
+                    if existingChecked.contains(assignment.compositeKey)
+                        || legacyChecked.contains("\(course.id):quiz:\(title)") {
                         assignment.isChecked = true
                     }
                     newAssignments.append(assignment)
@@ -322,7 +344,7 @@ final class AssignmentStore: ObservableObject {
     var lastRefreshedText: String {
         guard let last = lastRefreshed else { return "" }
         let ago = Int(Date.now.timeIntervalSince(last) / 60)
-        if ago < 1 { return "最終更新: たった今" }
-        return "最終更新: \(ago)分前"
+        if ago < 1 { return String(localized: "lastUpdatedNow") }
+        return String(format: String(localized: "lastUpdatedMins"), ago)
     }
 }

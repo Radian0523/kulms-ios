@@ -185,7 +185,7 @@ class WebViewFetcher: NSObject {
             // 全体タイムアウト 30 秒
             Task {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
-                resume(.failed("ログイン処理がタイムアウトしました。ネットワーク状況を確認してください。"))
+                resume(.failed(String(localized: "loginTimeout")))
             }
 
             // ログイン開始
@@ -403,6 +403,7 @@ actor SakaiAPIClient {
         let submissionStatus: String?
         let gradeDisplay: String?
         let grade: String?
+        let allowResubmission: Bool?
 
         /// Extract assignment ID from entityURL (e.g. "/direct/assignment/a/{uuid}")
         var assignmentId: String? {
@@ -449,6 +450,7 @@ actor SakaiAPIClient {
 
     struct RawAssignmentItem: Decodable {
         let submissions: [RawSubmission]?
+        let allowResubmission: Bool?
     }
 
     struct RawSubmission: Decodable {
@@ -460,11 +462,42 @@ actor SakaiAPIClient {
         let returned: Bool?
         let status: String?
         let dateSubmittedEpochSeconds: Int64?
+        let properties: [String: AnyCodable]?
+    }
+
+    /// Type-erased Codable wrapper for submission properties
+    struct AnyCodable: Decodable {
+        let value: Any?
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let s = try? container.decode(String.self) { value = s }
+            else if let i = try? container.decode(Int.self) { value = i }
+            else if let b = try? container.decode(Bool.self) { value = b }
+            else if let d = try? container.decode(Double.self) { value = d }
+            else { value = nil }
+        }
+
+        var stringValue: String? {
+            if let s = value as? String { return s }
+            if let i = value as? Int { return String(i) }
+            return nil
+        }
     }
 
     struct AssignmentWithDetail {
         let raw: RawAssignment
         let submissions: [RawSubmission]
+        let itemAllowResubmission: Bool?
+    }
+
+    // pages.json models for fetching assignment tool URL
+    struct PageEntry: Decodable {
+        let tools: [ToolEntry]?
+    }
+    struct ToolEntry: Decodable {
+        let id: String?
+        let toolId: String?
     }
 
     func fetchAssignmentItem(entityId: String) async throws -> RawAssignmentItem {
@@ -472,18 +505,39 @@ actor SakaiAPIClient {
         return try JSONDecoder().decode(RawAssignmentItem.self, from: data)
     }
 
+    // MARK: - Assignment Tool URL (via pages.json)
+
+    func fetchAssignmentToolUrl(siteId: String) async -> String? {
+        do {
+            let data = try await fetchData(path: "/direct/site/\(siteId)/pages.json")
+            let pages = try JSONDecoder().decode([PageEntry].self, from: data)
+            for page in pages {
+                for tool in page.tools ?? [] {
+                    if tool.toolId == "sakai.assignment.grades", let id = tool.id {
+                        return "https://lms.gakusei.kyoto-u.ac.jp/portal/site/\(siteId)/tool/\(id)"
+                    }
+                }
+            }
+        } catch is APIError {
+            // session expired — let it propagate in caller
+        } catch {
+            print("[KULMS] fetchAssignmentToolUrl(\(siteId)) error: \(error)")
+        }
+        return nil
+    }
+
     /// Fetch all assignments across all courses with concurrency limit.
     func fetchAllAssignments(
         onProgress: (@Sendable (Int, Int) -> Void)? = nil
-    ) async throws -> [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz])] {
+    ) async throws -> [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz], assignmentToolUrl: String?)] {
         let courses = try await fetchCourses()
         print("[KULMS] fetchAllAssignments: \(courses.count) courses found")
-        var results: [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz])] = []
+        var results: [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz], assignmentToolUrl: String?)] = []
         var completed = 0
 
         for batch in courses.chunked(into: concurrentLimit) {
             let batchResults = try await withThrowingTaskGroup(
-                of: (course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz]).self
+                of: (course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz], assignmentToolUrl: String?).self
             ) { group in
                 for course in batch {
                     group.addTask {
@@ -505,15 +559,22 @@ actor SakaiAPIClient {
                             rawQuizzes = []
                         }
 
+                        // Fetch assignment tool URL via pages.json
+                        let toolUrl: String? = if !rawAssignments.isEmpty {
+                            await self.fetchAssignmentToolUrl(siteId: course.id)
+                        } else {
+                            nil
+                        }
+
                         // Fetch individual assignment details in parallel
                         let enriched: [AssignmentWithDetail] = await withTaskGroup(of: AssignmentWithDetail.self) { detailGroup in
                             for raw in rawAssignments {
                                 detailGroup.addTask {
                                     if let id = raw.assignmentId, !id.isEmpty {
                                         let item = try? await self.fetchAssignmentItem(entityId: id)
-                                        return AssignmentWithDetail(raw: raw, submissions: item?.submissions ?? [])
+                                        return AssignmentWithDetail(raw: raw, submissions: item?.submissions ?? [], itemAllowResubmission: item?.allowResubmission)
                                     }
-                                    return AssignmentWithDetail(raw: raw, submissions: [])
+                                    return AssignmentWithDetail(raw: raw, submissions: [], itemAllowResubmission: nil)
                                 }
                             }
                             var collected: [AssignmentWithDetail] = []
@@ -523,10 +584,10 @@ actor SakaiAPIClient {
                             return collected
                         }
 
-                        return (course: course, assignments: enriched, quizzes: rawQuizzes)
+                        return (course: course, assignments: enriched, quizzes: rawQuizzes, assignmentToolUrl: toolUrl)
                     }
                 }
-                var collected: [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz])] = []
+                var collected: [(course: (id: String, name: String, type: String), assignments: [AssignmentWithDetail], quizzes: [RawQuiz], assignmentToolUrl: String?)] = []
                 for try await result in group {
                     collected.append(result)
                 }

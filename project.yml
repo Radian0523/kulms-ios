@@ -4,6 +4,10 @@ options:
   deploymentTarget:
     iOS: "17.0"
   xcodeVersion: "16.0"
+  knownRegions:
+    - Base
+    - en
+    - ja
 
 targets:
   KULMS:
